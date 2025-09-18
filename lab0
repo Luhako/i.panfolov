@@ -1,0 +1,41 @@
+#include <iostream>
+#include <fstream>
+#include <string> 
+
+int main()
+{
+    std::ifstream chitaem("chitaiOtsuda.txt");
+    
+    if (!chitaem) {
+        std::cout << "Unable to open file";
+        return 1;
+    }
+
+    std::string slovo;
+    char bukva;
+    bool etobukva = false;
+    std::string vseBukvi = "QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnmЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮйцукенгшщзхъфывапролджэячсмитьбю";
+    while (chitaem.get(bukva)) {
+        for (int i = 0; i < vseBukvi.length(); i++) {
+            if (bukva == vseBukvi[i]) {
+                etobukva = true;
+                break;
+            }
+        }
+        if (etobukva) {
+            etobukva = false;
+            slovo += bukva;
+        }
+        else if (slovo!=""){
+            std::cout << slovo << " ";
+            slovo = "";
+        }
+    }
+    if (slovo != "") {                   // последнее слово надо довыводить даже если после него ничего нет
+        std::cout << slovo << " ";
+        slovo = "";
+    }
+
+    chitaem.close(); //не забывайте закрывать файлы а-то они не открываются!!!
+    return 0;
+}
