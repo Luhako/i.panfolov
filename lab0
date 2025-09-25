@@ -1,23 +1,27 @@
 #include <iostream>
 #include <fstream>
 #include <string> 
+#include <map>
 
 int main()
 {
-    std::ifstream chitaem("chitaiOtsuda.txt");
+    std::ifstream chitaem("chitaiOtsuda.txt"); // файл откуда брать слова
     
-    if (!chitaem) {
+    if (!chitaem) { // попытка открыть файл
         std::cout << "Unable to open file";
         return 1;
     }
-
+    int all = 0;
+    std::map<std::string, int> SkolkoSlov = {};
     std::string slovo;
     char bukva;
     bool etobukva = false;
-    std::string vseBukvi = "QWERTYUIOPASDFGHJKLZXCVBNMqwertyuiopasdfghjklzxcvbnmЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮйцукенгшщзхъфывапролджэячсмитьбю";
-    while (chitaem.get(bukva)) {
-        for (int i = 0; i < vseBukvi.length(); i++) {
-            if (bukva == vseBukvi[i]) {
+    std::string vseBolBukvi = "QWERTYUIOPASDFGHJKLZXCVBNMЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ1234567890";
+    std::string vseMalBukvi = "qwertyuiopasdfghjklzxcvbnmйцукенгшщзхъфывапролджэячсмитьбю1234567890";
+    while (chitaem.get(bukva)) { // пока в файле что-то есть определяем буква для слова это или разделитель
+        for (int i = 0; i < vseBolBukvi.length(); i++) {
+            if (bukva == vseBolBukvi[i] || bukva == vseMalBukvi[i]) {
+                bukva = vseMalBukvi[i];
                 etobukva = true;
                 break;
             }
@@ -27,15 +31,41 @@ int main()
             slovo += bukva;
         }
         else if (slovo!=""){
-            std::cout << slovo << " ";
+            all += 1;
+            //std::cout << slovo << " ";
+            bool slovaNet = true;
+            for (auto i : SkolkoSlov) {
+                if (i.first == slovo) {
+                    slovaNet = false;
+                    i.second++;
+                    break;
+                }
+            }
+            if (slovaNet) {
+                SkolkoSlov.insert({ slovo,1 });
+            }
             slovo = "";
         }
     }
     if (slovo != "") {                   // последнее слово надо довыводить даже если после него ничего нет
-        std::cout << slovo << " ";
+        all += 1;
+        //std::cout << slovo << " ";
+        bool slovaNet = true;
+        for (auto i : SkolkoSlov) {
+            if (i.first == slovo) {
+                slovaNet = false;
+                i.second++;
+                break;
+            }
+        }
+        if (slovaNet) {
+            SkolkoSlov.insert({ slovo,1 });
+        }
         slovo = "";
     }
 
     chitaem.close(); //не забывайте закрывать файлы а-то они не открываются!!!
+
+
     return 0;
 }
