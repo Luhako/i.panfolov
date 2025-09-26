@@ -3,6 +3,49 @@
 #include <string> 
 #include <map>
 
+class Schetovod { // считает слова
+private:
+    std::map<std::string, int> SkolkoSlov = {};
+    int all = 0;
+
+public:
+    void newSlovo(std::string slovo) {
+        all += 1;
+        bool slovaNet = true;
+        for (auto i : SkolkoSlov) {
+            if (i.first == slovo) {
+                slovaNet = false;
+                SkolkoSlov[i.first]++;
+                break;
+            }
+        }
+        if (slovaNet) {
+            SkolkoSlov.insert({slovo,1});
+        }
+    }
+
+    bool empty() {
+        return SkolkoSlov.empty();
+    }
+
+    std::pair<std::string, int> popSamoeChastoeSlovo() {
+        int skolko = 0;
+        std::string slovo;
+        for (auto i : SkolkoSlov) {
+            if (i.second > skolko) {
+                slovo = i.first;
+                skolko = i.second;
+            }
+        }
+        SkolkoSlov.erase(slovo);
+        return { slovo, skolko };
+    }
+
+    int getAll() {
+        return all;
+    }
+};
+
 int main()
 {
     std::ifstream chitaem("chitaiOtsuda.txt"); // файл откуда брать слова
@@ -11,12 +54,11 @@ int main()
         std::cout << "Unable to open file for read";
         return 1;
     }
-    int all = 0;
-    std::map<std::string, int> SkolkoSlov = {};
+
+    Schetovod schetovod;
     std::string slovo;
     char bukva;
     bool etobukva = false;
-    bool slovaNet = true;
     std::string vseBolBukvi = "QWERTYUIOPASDFGHJKLZXCVBNMЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ1234567890";
     std::string vseMalBukvi = "qwertyuiopasdfghjklzxcvbnmйцукенгшщзхъфывапролджэячсмитьбю1234567890";
     while (chitaem.get(bukva)) { // пока в файле что-то есть определяем буква для слова это или разделитель
@@ -32,37 +74,12 @@ int main()
             slovo += bukva;
         }
         else if (slovo!=""){
-            all += 1;
-            //std::cout << slovo << " ";
-            slovaNet = true;
-            for (auto i : SkolkoSlov) {
-                if (i.first == slovo) {
-                    slovaNet = false;
-                    SkolkoSlov[i.first]++;
-                    std::cout << i.second << " ";
-                    break;
-                }
-            }
-            if (slovaNet) {
-                SkolkoSlov.insert({ slovo,1 });
-            }
+            schetovod.newSlovo(slovo);
             slovo = "";
         }
     }
     if (slovo != "") {                   // последнее слово надо довыводить даже если после него ничего нет
-        all += 1;
-        //std::cout << slovo << " ";
-        slovaNet = true;
-        for (auto i : SkolkoSlov) {
-            if (i.first == slovo) {
-                slovaNet = false;
-                SkolkoSlov[i.first]++;
-                break;
-            }
-        }
-        if (slovaNet) {
-            SkolkoSlov.insert({slovo,1});
-        }
+        schetovod.newSlovo(slovo);
         slovo = "";
     }
 
@@ -74,18 +91,10 @@ int main()
         return 1;
     }
 
-    int skolko = 0;
-    while (!SkolkoSlov.empty()) {
-        for (auto i : SkolkoSlov) {
-            if (i.second > skolko) {
-                slovo = i.first;
-                skolko = i.second;
-                std::cout << i.second;
-            }
-        }
-        pishem << slovo << " " << skolko << " " << (skolko / double(all)) << "\n";
-        SkolkoSlov.erase(slovo);
-        skolko = 0;
+    while (!schetovod.empty()) {
+        std::pair<std::string, int> samoeChastoeSlovo = schetovod.popSamoeChastoeSlovo();
+        pishem << samoeChastoeSlovo.first << " " << samoeChastoeSlovo.second << " " << (samoeChastoeSlovo.second / double(schetovod.getAll())) << "\n";
+        
     }
 
     pishem.close();
