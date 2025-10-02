@@ -1,0 +1,128 @@
+#include <iostream>
+#include <fstream>
+#include <string> 
+#include <map>
+
+class Schetovod { // считает слова
+private:
+    std::map<std::string, int> SkolkoSlov = {};
+    int all = 0;
+
+public:
+    int newSlovo(std::string slovo) {
+        if (slovo == "") {
+            return 1;
+        }
+        all += 1;
+        bool slovaNet = true;
+        for (auto i : SkolkoSlov) {
+            if (i.first == slovo) {
+                slovaNet = false;
+                SkolkoSlov[i.first]++;
+                break;
+            }
+        }
+        if (slovaNet) {
+            SkolkoSlov.insert({slovo,1});
+        }
+        return 0;
+    }
+
+    bool empty() {
+        return SkolkoSlov.empty();
+    }
+
+    std::pair<std::string, int> popSamoeChastoeSlovo() {
+        int skolko = 0;
+        std::string slovo;
+        for (auto i : SkolkoSlov) {
+            if (i.second > skolko) {
+                slovo = i.first;
+                skolko = i.second;
+            }
+        }
+        SkolkoSlov.erase(slovo);
+        return { slovo, skolko };
+    }
+
+    int getAll() {
+        return all;
+    }
+};
+
+class ChitatelSlov {
+    private:
+        std::ifstream chitaem;
+    public:
+        ChitatelSlov(std::string file){
+            chitaem.open(file);
+        }
+        bool isOpen() {
+            return bool(chitaem);
+        }
+        std::string getWord() {
+            std::string slovo;
+            char bukva;
+            bool etobukva = false;
+            std::string vseBolBukvi = "QWERTYUIOPASDFGHJKLZXCVBNMЙЦУКЕНГШЩЗХЪФЫВАПРОЛДЖЭЯЧСМИТЬБЮ1234567890";
+            std::string vseMalBukvi = "qwertyuiopasdfghjklzxcvbnmйцукенгшщзхъфывапролджэячсмитьбю1234567890";
+            while (chitaem.get(bukva)) { // пока в файле что-то есть определяем буква для слова это или разделитель
+                for (int i = 0; i < vseBolBukvi.length(); i++) {
+                    if (bukva == vseBolBukvi[i] || bukva == vseMalBukvi[i]) {
+                        bukva = vseMalBukvi[i];
+                        etobukva = true;
+                        break;
+                    }
+                }
+                if (etobukva) {
+                    etobukva = false;
+                    slovo += bukva;
+                }
+                else if (slovo != "") {
+                    return slovo;
+                }
+            }
+            if (slovo != "") {
+                return slovo;
+            }
+            return "";
+        }
+        void closeFile() {
+            chitaem.close();
+        }
+};
+
+int main()
+{
+    ChitatelSlov chitatel("chitaiOtsuda.txt");
+
+    
+    if (!chitatel.isOpen()){ // попытка открыть файл
+        std::cout << "Unable to open file for read";
+        return 1;
+    }
+
+    Schetovod schetovod;
+
+    while (!schetovod.newSlovo(chitatel.getWord())){}
+
+    chitatel.closeFile(); //не забывайте закрывать файлы а-то они не открываются!!!
+
+
+    std::ofstream pishem("pishiSuda.txt");
+    if (!pishem) { // попытка открыть файл? нужна ли она если я пишу?
+        std::cout << "Unable to open file for write";
+        return 1;
+    }
+
+    while (!schetovod.empty()) {
+        std::pair<std::string, int> samoeChastoeSlovo = schetovod.popSamoeChastoeSlovo();
+        pishem << samoeChastoeSlovo.first << " " << samoeChastoeSlovo.second << " " << (samoeChastoeSlovo.second / double(schetovod.getAll())) << "\n";
+        
+    }
+
+    pishem.close();
+
+
+    return 0;
+}
