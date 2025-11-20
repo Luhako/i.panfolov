@@ -55,14 +55,51 @@ public:
         znach[key] = znachenie;
         keys.push_back(key);
     }
-
-
 };
 
+class LFU : private ICache {
+private:
+    std::map<int, int> zaprosy;
+
+    std::map<int, int> znach;
+
+    int lenght;
+
+public:
+    LFU(int leng) {
+        lenght = leng;
+    }
+    int operator[](int i) {
+
+    }
+
+    int get(int key) override {
+        if (!znach.count(key)) {
+            return NULL;
+        }
+        zaprosy[key] += 1;
+        return znach[key];
+    };
+
+    void put(int key, int znachenie) override {
+        if (znach.size() == lenght) {
+            std::pair<int, int> minobr = { 0, 0 };
+            for (std::pair<int, int> i : zaprosy) {
+                if (i.second < minobr.second || minobr.second == 0) {
+                    minobr = i;
+                }
+            }
+            znach.erase(minobr.first);
+            zaprosy.erase(minobr.first);
+        }
+        zaprosy[key] = 1;
+        znach[key] = znachenie;
+    };
+};
 
 int main()
 {
-    LRU i = 5;
+    LFU i = 5;
     i.put(1, 2);
-    std::cout<<i.get(2);
+    std::cout<<i.get(1);
 }
