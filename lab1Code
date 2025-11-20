@@ -1,0 +1,63 @@
+#include <iostream>
+#include <list>
+#include <map>
+
+class Fib {
+
+};
+
+class ICache { //интерфейс для наследования кэшей, чтобы их использовали
+public:
+    virtual int get(int key) = 0{
+
+    }
+
+    virtual void put(int key, int znachenie) = 0{
+
+    }
+};
+
+class LRU : private ICache {
+private:
+    std::list<int> keys;
+
+    std::map<int, int> znach;
+
+    int lenght;
+
+public:
+    LRU(int leng) {
+        lenght = leng;
+    }
+
+    int operator[](int i) {
+        
+    }
+    int get(int key) override {
+        keys.push_back(key);
+        for (auto iter = keys.begin(); iter != keys.end(); iter++) { // сперва была попытка последний вызванный ставить в начало списка и идти сзади но итераторы не так работают похоже...
+            if (*iter == key) {
+                keys.erase(iter);
+                break;
+            }
+        }
+        return znach[key];
+    }
+
+    void put(int key, int znachenie) override {
+        if (keys.size() == lenght) {
+            znach.erase(*(keys.begin()));
+            keys.pop_front();
+        }
+        znach[key] = znachenie;
+        keys.push_back(key);
+    }
+
+
+};
+
+
+int main()
+{
+
+}
