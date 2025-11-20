@@ -8,11 +8,11 @@ class Fib {
 
 class ICache { //интерфейс для наследования кэшей, чтобы их использовали
 public:
-    virtual int get(int key) = 0{
+    virtual int get(int key) = 0 {
 
     }
 
-    virtual void put(int key, int znachenie) = 0{
+    virtual void put(int key, int znachenie) = 0 {
 
     }
 };
@@ -31,9 +31,12 @@ public:
     }
 
     int operator[](int i) {
-        
+
     }
     int get(int key) override {
+        if (!znach.count(key)) {
+            return NULL;
+        }
         keys.push_back(key);
         for (auto iter = keys.begin(); iter != keys.end(); iter++) { // сперва была попытка последний вызванный ставить в начало списка и идти сзади но итераторы не так работают похоже...
             if (*iter == key) {
@@ -59,5 +62,7 @@ public:
 
 int main()
 {
-
+    LRU i = 5;
+    i.put(1, 2);
+    std::cout<<i.get(2);
 }
