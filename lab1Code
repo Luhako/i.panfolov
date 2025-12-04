@@ -2,10 +2,6 @@
 #include <list>
 #include <map>
 
-class Fib {
-
-};
-
 class ICache { //интерфейс для наследования кэшей, чтобы их использовали
 public:
     virtual int get(int key) = 0 {
@@ -17,7 +13,7 @@ public:
     }
 };
 
-class LRU : private ICache {
+class LRU : public ICache {
 private:
     std::list<int> keys;
 
@@ -31,7 +27,7 @@ public:
     }
 
     int operator[](int i) {
-
+        return get(i); // ладно пусть будет пока так на всякий случай
     }
     int get(int key) override {
         if (!znach.count(key)) {
@@ -57,7 +53,8 @@ public:
     }
 };
 
-class LFU : private ICache {
+
+class LFU : public ICache {
 private:
     std::map<int, int> zaprosy;
 
@@ -70,7 +67,7 @@ public:
         lenght = leng;
     }
     int operator[](int i) {
-
+        return get(i); // ладно пусть будет пока так на всякий случай
     }
 
     int get(int key) override {
@@ -97,9 +94,52 @@ public:
     };
 };
 
+class Fib {
+    ICache* cash;
+public:
+    Fib(ICache& cache) { // нельзя просто ICache вылезает ошибка нельзя создать экземпляр, а это кземпляр? ну да копия получается... так что ссылка
+        cash = &cache;
+    }
+    int solve(int n) {
+        if (n == 0 || n == 1) {
+            return n;
+        }
+        int fromCash = (*cash).get(n);
+        if (fromCash != NULL) {
+            return fromCash;
+        }
+        int toCash = (solve(n - 1) + solve(n - 2));
+        (*cash).put(n, toCash);
+        return toCash;
+    }
+};
+
+
 int main()
 {
-    LFU i = 5;
-    i.put(1, 2);
-    std::cout<<i.get(1);
+    int n;
+    std::cout << "Mode 0 = LRU, others = LFU\n";
+    std::cin >> n;
+    std::cout << "negative number to exit\n";
+    if (n == 0) {
+        LRU lru(10);
+        Fib fibonachi(lru);
+        std::cin >> n;
+        while (n >= 0) {
+            std::cout << fibonachi.solve(n) << "\n";
+            std::cin >> n;
+        }
+    }
+    else {
+        LFU lfu(10);
+        Fib fibonachi(lfu);
+        std::cin >> n;
+        while (n >= 0) {
+            std::cout << fibonachi.solve(n) << "\n";
+            std::cin >> n;
+        }
+    }
+    
+    
 }
+
