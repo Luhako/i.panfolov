@@ -1,0 +1,349 @@
+#include <iostream>
+#include <string>
+#include <stdlib.h>
+#include <map>
+
+using namespace std;
+
+class Smertniy {
+protected:
+    string name;
+    int hp;
+    int attack;
+    int st;
+    int attackCost;
+    int defCost;
+    int staRegen;
+    int state;
+
+public:
+    virtual string getName() {
+        return name;
+    }
+
+    virtual int getHP() {
+        return hp;
+    }
+
+    virtual int getAttack() {
+        return attack;
+    }
+
+    virtual int getST() {
+        return st;
+    }
+
+    virtual int getAttackCost() {
+        return attackCost;
+    }
+
+    virtual int getDefCost() {
+        return defCost;
+    }
+
+    virtual int getStaRegen() {
+        return staRegen;
+    }
+
+    virtual int getState() {
+        return state;
+    }
+};
+
+class Player;
+
+class GameObject {
+public:
+    virtual bool interact(Player* player) = 0 {};
+};
+
+class Chest : public GameObject {
+private:
+    int numOfPoitions;
+public:
+    bool interact(Player* player) override {
+        player->addPoitions(numOfPoitions); // даёт зелья
+        return true;
+    }
+    Chest() {
+        numOfPoitions = rand() % 3 + 1;
+    }
+};
+
+class Enemy : public GameObject, public Smertniy {
+public:
+    Enemy(string nam) {
+        name = nam;
+        hp = 50;
+        attack = 15;
+        st = 100;
+        attackCost = 30;
+        defCost = 20;
+        staRegen = 30;
+        state = 0;
+    }
+    bool interact(Player* player) override {
+        Fight fight(player, this);
+        return fight.action();
+    }
+    int chooseAction() {
+        state = (rand() % 2 + 1);
+        if ((state = 1 && attackCost > st) || (state = 2 && defCost > st)) {
+            state = 3;
+        }
+        return state;
+    }
+};
+
+class TargetChest : public GameObject { //победный сундук
+    bool interact(Player* player) override {
+        (*player).setWin(true);
+        return true;
+    }
+};
+
+class Field;
+
+class Player: public Smertniy {
+private:
+    int x; //координаты
+    int y; 
+    int ox; //старые координаты
+    int oy;
+    int poitions;
+    int poitionsEffect;
+    bool win; //обозначает победу
+
+public:
+    Player(string nam) {
+        name = nam;
+        x = 0;
+        y = 0;
+        ox = 0;
+        oy = 0;
+        hp = 100;
+        attack = 30;
+        st = 100;
+        attackCost = 30;
+        defCost = 20;
+        staRegen = 30;
+        poitions = 0;
+        poitionsEffect = 20;
+        state = 0;
+        win = false; //ещё не победа
+    }
+    int getX() {
+        return x;
+    }
+
+    int getY() {
+        return y;
+    }
+
+    void move(char dir, Field* field){
+        if (dir == 'a') {
+            x--;
+        }else if (dir == 'd') {
+            x++;
+        }else if(dir == 'w') {
+            y++;
+        }else if (dir == 's') {
+            y--;
+        }
+        bool moved = (*field).canmove(x,y);
+        if (!moved) {
+            cout << "туда нельзя";
+            x = ox;
+            y = oy;
+        }
+        else {
+            GameObject* object = (*field).getObject(x, y);
+            if (object == nullptr) {
+                ox = x;
+                oy = y;
+            }
+            else {
+                moved = object->interact(this);
+                if (moved){
+                    (*field).popObject(x, y);
+                    ox = x;
+                    oy = y;
+                }
+                else {
+                    x = ox;
+                    y = oy;
+                }
+            }
+        }
+    }
+
+    void setWin(bool won) {
+        win = won;
+    }
+
+    bool getWin() {
+        return win;
+    }
+
+    void addPoitions(int num) {
+        poitions += num;
+        if (poitions < 0) { poitions = 0; }
+    }
+    
+    int getPoitions() {
+        return poitions;
+    }
+
+    int getPoitionsEffect() {
+        return poitionsEffect;
+    }
+};
+
+
+
+class Field {
+private:
+    map<int, char> textures;
+    int width; // ширина поля
+    int height; //длинна поля
+    GameObject** objects; // ссылка на массив ссылок на конкретные объекты
+    int* wallsAndObjects; //0 - пустота, 1-стена, 2-сундук, 3-цель/сундук, 4-враг для генерации по шаблону?
+
+    void setRandomObject(int numObject, int type){ //расстановка объекта на случайных позициях
+        int i = 0;
+        int x, y;
+        while (i < numObject) {
+            x = rand() % width;
+            y = rand() % height;
+            if (x!= 0 && y!=0 && wallsAndObjects[y * width + x] == 0) { // на позиции 0 0 будет игрок
+                wallsAndObjects[y * width + x] = type;
+                i++;
+            }
+        }
+    }
+
+    void generate() { // расстановка конкретных объектов (создание объектов и сохранение ссылок на них)
+        int num3 = rand() % count(wallsAndObjects, wallsAndObjects+(height*width), 3); //определение номера тройки целевого сундука
+        for (int i = 0; i < height * width; i++) { // for(auto start{numbers.begin()}; start !=numbers.end(); start++ )
+            if (wallsAndObjects[i] == 2) {
+                objects[i] = new Chest();
+            }else if(wallsAndObjects[i] == 4) {
+                objects[i] = new Enemy("гопник");
+            }
+            else if (wallsAndObjects[i] == 3) {
+                if (num3 == 0) {
+                    objects[i] = new TargetChest();
+                }
+                else {
+                    num3--;
+                    objects[i] = new Chest();
+                }
+            }
+            else {
+                objects[i] = nullptr;
+            }
+        }
+    }
+
+    void setTextures() {
+        textures[0] = '.';
+        textures[1] = '#';
+        textures[2] = '$';
+        textures[3] = '$';
+        textures[4] = '!';
+        textures[5] = '@';
+    }
+
+public:
+    Field(int wid, int heg, int* walls, int rChest, int rEnimies){
+        width = wid;
+        height = heg;
+        wallsAndObjects = walls;
+        objects = (GameObject**) malloc(sizeof(GameObject*) * width * height);
+        setRandomObject(rChest, 2);
+        setRandomObject(rEnimies, 4);
+        generate();
+        setTextures();
+    }
+
+    ~Field() {
+        for (int i = 0; i < height * width; i++) {
+            if (objects[i] != nullptr) {
+                delete objects[i];
+            }
+        }
+        free(objects);
+    }
+
+    void paint(int playerX, int playerY) { //поле рисует себя
+        wallsAndObjects[playerY * width + playerX] = 5;
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                cout << textures[wallsAndObjects[y * width + x]];
+            }
+            cout << "\n";
+        }
+        wallsAndObjects[playerY * width + playerX] = 0;
+    }
+
+    bool canmove(int playerX, int playerY) {
+        if (playerX < 0 || playerX >= width || playerY<0 || playerY>=height || wallsAndObjects[playerY*width+playerX]) {
+            return false;
+        }
+        return true;
+    }
+
+    GameObject* getObject(int playerX, int playerY) {
+        return objects[playerY * width + playerX];
+    }
+
+    void popObject(int x, int y) {
+        delete objects[x * width + y];
+        objects[x * width + y] = nullptr;
+        wallsAndObjects[x * width + y] = 0;
+    }
+};
+
+class Fight {
+private:
+    Player* player;
+    Enemy* enemy;
+    map<int, string> slovar;
+public:
+    Fight(Player* pla, Enemy* ene) {
+        player = pla;
+        enemy = ene;
+        slovar[1] = "атакует";
+        slovar[2] = "защищается";
+        slovar[3] = "переводит дух";
+    }
+    bool action() {
+        cout << (*enemy).getName() << " JP:" << (*enemy).getHP() << "\n";
+        cout << "враг " << slovar[(*enemy).chooseAction()] << "\n";
+        cout << (*player).getName() << " JP:" << (*player).getHP() << " ST:" << (*player).getST() << " Зелий лечения:" << (*player).getPoitions() << "\n";
+        cout << "действия:\n 1-атака(" << (*player).getAttackCost() <<
+            "ST) 2-Защита(" << (*player).getDefCost() << "ST) 3-перевести дух(+" << (*player).getStaRegen() <<
+            "ST) 4-использовать зелье(+" << (*player).getPoitionsEffect() << "HP) 5-убежать";
+    }
+};
+
+int main()
+{
+    srand(time(NULL)); // случайнение случайных чисел
+    int width = 5;
+    int height = 3;
+    int rC = 1;
+    int rE = 1;
+    int objects[] = {0, 1, 0, 4, 0,
+                     0, 1, 2, 1, 0,
+                     0, 4, 0, 1, 3 };
+    Field field(width, height, objects, rC, rE);
+    Player player("Игрок");
+    char delta = 0;
+    while (true){
+        field.paint(player.getX(), player.getY());
+        cout << "w-вверх, d-вправо, s-вниз, a-влево";
+        cin >> delta;
+        
+    }
+}
