@@ -58,7 +58,7 @@ class ChitatelSlov {
             chitaem.open(file);
         }
         bool isOpen() {
-            return bool(chitaem);
+            return chitaem.is_open();
         }
         std::string getWord() {
             std::string slovo;
