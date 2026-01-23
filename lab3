@@ -18,7 +18,7 @@ public:
 	}
 
 	bool open(string name) {
-		reader.open(name);
+		reader.open(name, ios::binary); //куча потерянного времени из-за символа 26 и открытия файла в обычном режиме
 		if (!reader.is_open()) {
 			cout << "не удалось открыть файл";
 			return false;
@@ -46,9 +46,10 @@ public:
 	short readSample() {
 		char lengC[2];
 		reader.read(lengC, 2);
+		int gcout = reader.gcount();
 		short leng;
 		memcpy(&leng, lengC, sizeof(leng));
-		//cout << leng;
+		//cout << leng <<" " << gcout << "\n";
 		return leng;
 	}
 };
@@ -122,7 +123,7 @@ public:
 	}
 
 	bool open(string name) {
-		writer.open(name);
+		writer.open(name, ios::binary);
 		if (!writer.is_open()) {
 			cout << "не удалось открыть файл";
 			return false;
@@ -186,6 +187,7 @@ public:
 };
 
 class Shh {
+public:
 	void shhhh(short* sample, int lssr) {
 		*sample /= lssr;
 	}
@@ -198,6 +200,7 @@ private:
 	string config;
 	Muter muter;
 	Mixer mixer;
+	Shh shh;
 
 public:
 	sampleChanger(string conf, SoundReaderSkiper* rdrs, int number) : mixer(rdrs,number){
@@ -231,8 +234,8 @@ public:
 			}
 			else if (comm == "shh") {
 				conf >> comm;
-				int start = stoi(comm);
-
+				int dev = stoi(comm);
+				shh.shhhh(sample, dev);
 			}
 		}
 	}
@@ -243,7 +246,7 @@ int main()
 	SetConsoleOutputCP(CP_UTF8);//нужно чтобы консоль использовала ту же кодировку что и принты
 
 	SoundReader reader;
-	reader.open("truba-upala.wav");
+	reader.open("900.wav");
 
 	Writer writer;
 	writer.open("output.wav");
@@ -312,7 +315,7 @@ int main()
 
 	sampleChanger changer(cReader.getConfigLine(), dopSounds, number);
 	short sample;
-	for (int i = 0; i < sizeData / 2; i++) {
+	for (int i = 0; i < (sizeData/2); i++) {
 		sample = reader.readSample();
 		changer.doSample(i, &sample);
 		writer.writeSample(sample);
