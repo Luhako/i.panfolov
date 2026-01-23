@@ -1,0 +1,325 @@
+#include <iostream>
+#include <fstream>
+#include <string>
+#include <sstream>
+#include <windows.h>
+
+using namespace std;
+
+class Reader {
+protected:
+	ifstream reader;
+public:
+	~Reader() {
+		if (reader.is_open()) {
+			reader.close();
+		}
+
+	}
+
+	bool open(string name) {
+		reader.open(name);
+		if (!reader.is_open()) {
+			cout << "не удалось открыть файл";
+			return false;
+		}
+		cout << name << "\n";
+		return true;
+	}
+};
+
+class SoundReader: public Reader{
+public:
+	void readSymvols(char* symvols, int leng) {
+		reader.read(symvols, leng);
+		symvols[leng] = '\0'; //при передаче нулевое окончание куда-то пропадает...
+	}
+	
+	int readLenght() {
+		char lengC[4];
+		reader.read(lengC, 4);
+		int leng;
+		memcpy(&leng, lengC, sizeof(leng));
+		return leng;
+	}
+
+	short readSample() {
+		char lengC[2];
+		reader.read(lengC, 2);
+		short leng;
+		memcpy(&leng, lengC, sizeof(leng));
+		//cout << leng;
+		return leng;
+	}
+};
+
+class SoundReaderSkiper: public SoundReader {
+public:
+	int skipStartGetDataSize() {
+		char riff[5];
+		readSymvols(riff, 4);
+
+		int almostAllSize = readLenght();
+
+		char wave[5];
+		readSymvols(wave, 4);
+
+		char fmt[5];
+		readSymvols(fmt, 4);
+
+		int fmtSize = readLenght();
+
+		char forBiliberda[2]; // массивы на один больше на всякий случай для нулевого элемента (хотя там ридеру вообще пофиг)
+
+		for (int i = 0; i < fmtSize; i++) {
+			readSymvols(forBiliberda, 1);
+		}
+
+		char data[5];
+		int sizeData;
+
+		while (true) {
+			readSymvols(data, 4);
+			sizeData = readLenght();
+			if ((string)data == "data") {
+				break;
+			}
+			for (int i = 0; i < sizeData; i++) {
+				readSymvols(forBiliberda, 1);
+			}
+		}
+		return sizeData;
+	}
+};
+
+class configReader: public Reader {
+private:
+	string configLine;
+public:
+	string formConfigLine(){
+		string commandLine;
+		while (getline(reader, commandLine)) {
+			if (commandLine[0] != '#') {
+				configLine += commandLine + " ";
+			}
+		}
+		return configLine;
+	}
+
+	string getConfigLine() {
+		return configLine;
+	}
+};
+
+class Writer {
+private:
+	ofstream writer;
+public:
+	~Writer() {
+		if (writer.is_open()) {
+			writer.close();
+		}
+	}
+
+	bool open(string name) {
+		writer.open(name);
+		if (!writer.is_open()) {
+			cout << "не удалось открыть файл";
+			return false;
+		}
+		cout << name << "\n";
+		return true;
+	}
+
+	void writeSymvols(char* symvols, int leng) {
+		writer.write(symvols, leng);
+		//при передаче нулевое окончание куда-то пропадает...?
+	}
+
+	void writeLenght(int leng) {
+		char lengC[4];
+		memcpy(lengC, &leng, sizeof(lengC));
+		writer.write(lengC, 4);
+	}
+
+	void writeSample(short leng) {
+		char lengC[2];
+		//cout << leng;
+		memcpy(lengC, &leng, sizeof(lengC));
+		writer.write(lengC, 2);
+		
+	}
+};
+
+class Muter {
+public:
+	void mute(short* sample, int num, int s, int f) {
+		if (s * 44100 <= num && num < f * 44100) {
+			*sample = 0;
+		}
+	}
+};
+
+class Mixer {
+private:
+	int* dataLenghts;
+	SoundReaderSkiper* readers;
+
+public:
+	Mixer(SoundReaderSkiper* rdrs, int number){
+		readers = rdrs;
+		dataLenghts = (int*)malloc(sizeof(int) * number);
+		for (int i = 0; i < number; i++) {
+			dataLenghts[i] = readers[i].skipStartGetDataSize();
+		}
+	}
+	~Mixer() {
+		free(dataLenghts);
+	}
+
+	void mix(short* sample,int sampleNumber, int trakNum, int start) {
+		if (start * 44100 <= sampleNumber && sampleNumber < start * 44100 + dataLenghts[trakNum - 2] / 2) {//потому что дополнительные начинаются со второго, но нумеруются с 0
+			*sample = ((*sample)+readers[trakNum - 2].readSample())/2;
+		}
+	}
+
+};
+
+class Shh {
+	void shhhh(short* sample, int lssr) {
+		*sample /= lssr;
+	}
+};
+
+class sampleChanger { //вроде там было что-то про то чтобы память не зависла от размера, так что читаем посекундно
+private:
+	int sampleNumber;
+	short* sample;
+	string config;
+	Muter muter;
+	Mixer mixer;
+
+public:
+	sampleChanger(string conf, SoundReaderSkiper* rdrs, int number) : mixer(rdrs,number){
+		config = conf;
+	}
+
+	void chooseSample(int num, short* samp) {
+		sampleNumber = num;
+		sample = samp;
+	}
+
+	void doSample(int num, short* samp) {
+		chooseSample(num, samp);
+		istringstream conf(config);
+		string comm;
+		while (conf >> comm) { //тут именно два аргумента, возможно ли иное число?
+			if (comm == "mute") {
+				conf >> comm;
+				int start = stoi(comm);
+				conf >> comm;
+				int finish = stoi(comm);
+				muter.mute(sample, sampleNumber, start, finish);
+			}
+			else if (comm == "mix") {
+				conf >> comm;
+				comm[0] = '0';
+				int numberOfInput = stoi(comm);
+				conf >> comm;
+				int start = stoi(comm);
+				mixer.mix(sample, sampleNumber, numberOfInput, start);
+			}
+			else if (comm == "shh") {
+				conf >> comm;
+				int start = stoi(comm);
+
+			}
+		}
+	}
+};
+
+int main()
+{
+	SetConsoleOutputCP(CP_UTF8);//нужно чтобы консоль использовала ту же кодировку что и принты
+
+	SoundReader reader;
+	reader.open("truba-upala.wav");
+
+	Writer writer;
+	writer.open("output.wav");
+
+	char riff[5];
+	reader.readSymvols(riff, 4);
+	cout << riff << "\n";
+	writer.writeSymvols(riff, 4);
+
+	int almostAllSize = reader.readLenght();
+	cout << almostAllSize << "\n";
+	writer.writeLenght(almostAllSize);
+
+	char wave[5];
+	reader.readSymvols(wave, 4);
+	writer.writeSymvols(wave, 4);
+	cout << wave << "\n";
+
+	char fmt[5];
+	reader.readSymvols(fmt, 4);
+	writer.writeSymvols(fmt, 4);
+	cout << fmt << "\n";
+
+	int fmtSize = reader.readLenght();
+	cout << fmtSize << "\n";
+	writer.writeLenght(fmtSize);
+
+	char forBiliberda[2]; // массивы на один больше на всякий случай для нулевого элемента (хотя там ридеру вообще пофиг)
+
+	for (int i = 0; i < fmtSize; i++) {
+		reader.readSymvols(forBiliberda, 1);
+		cout << forBiliberda;
+		writer.writeSymvols(forBiliberda, 1);
+	}
+	cout << "\n";
+
+	char data[5];
+	int sizeData;
+	 
+	while (true) {
+		reader.readSymvols(data, 4);
+		cout << data << "\n";
+		writer.writeSymvols(data, 4);
+		sizeData = reader.readLenght();
+		cout << sizeData << "\n";
+		writer.writeLenght(sizeData);
+		if ((string)data == "data") {
+			break;
+		}
+		for (int i = 0; i < sizeData; i++) {
+			reader.readSymvols(forBiliberda, 1);
+			writer.writeSymvols(forBiliberda, 1);
+			cout << forBiliberda;
+		}
+		cout << "\n";
+	}
+	cout << "\n";
+
+	configReader cReader;
+	cReader.open("config.txt");
+	cout << cReader.formConfigLine();
+
+	int number = 1;
+	SoundReaderSkiper* dopSounds = new SoundReaderSkiper[number];
+	dopSounds[0].open("truba-upala.wav");
+
+	sampleChanger changer(cReader.getConfigLine(), dopSounds, number);
+	short sample;
+	for (int i = 0; i < sizeData / 2; i++) {
+		sample = reader.readSample();
+		changer.doSample(i, &sample);
+		writer.writeSample(sample);
+		//cout << sample << "\n";
+	}
+
+	delete[] dopSounds;
+}
+
+
