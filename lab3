@@ -3,8 +3,63 @@
 #include <string>
 #include <sstream>
 #include <windows.h>
+#include <stdexcept>
 
 using namespace std;
+
+class CommandLineException : public runtime_error {
+private:
+	int exitCode;
+
+public:
+	CommandLineException(string message, int code = 1)
+		: runtime_error(message), exitCode(code) {}
+
+	int getCode(){
+		return exitCode;
+	}
+};
+
+class FileException : public runtime_error {
+private:
+	int exitCode;
+
+public:
+	FileException(string message, int code = 2)
+		: runtime_error(message), exitCode(code) {}
+
+	int getCode() {
+		return exitCode;
+	}
+};
+
+class ConfigException : public FileException {
+private:
+	int exitCode;
+
+public:
+	ConfigException(string message, int code = 3)
+		: FileException(message), exitCode(code) {}
+
+	int getCode() {
+		return exitCode;
+	}
+};
+
+
+class WAVException : public FileException {
+private:
+	int exitCode;
+
+public:
+	WAVException(string message, int code = 4)
+		: FileException(message), exitCode(code) {}
+
+	int getCode() {
+		return exitCode;
+	}
+};
+
 
 class Reader {
 protected:
@@ -14,13 +69,13 @@ public:
 		if (reader.is_open()) {
 			reader.close();
 		}
-
 	}
 
 	bool open(string name) {
 		reader.open(name, ios::binary); //куча потерянного времени из-за символа 26 и открытия файла в обычном режиме
 		if (!reader.is_open()) {
 			//cout << "не удалось открыть файл" << name << "\n";
+			throw FileException("не удаётся открыть файл" + name);
 			return false;
 		}
 		//cout << name << "\n";
@@ -60,13 +115,31 @@ public:
 		char riff[5];
 		readSymvols(riff, 4);
 
+		if ((string)riff != "RIFF") {
+			WAVException err("неправильный формат файла");
+			cerr << err.what();
+			exit(err.getCode());
+		}
+
 		int almostAllSize = readLenght();
 
 		char wave[5];
 		readSymvols(wave, 4);
 
+		if ((string)wave != "WAVE") {
+			WAVException err("неправильный формат файла");
+			cerr << err.what();
+			exit(err.getCode());
+		}
+
 		char fmt[5];
 		readSymvols(fmt, 4);
+
+		if ((string)fmt != "fmt ") {
+			WAVException err("неправильный формат файла");
+			cerr << err.what();
+			exit(err.getCode());
+		}
 
 		int fmtSize = readLenght();
 
@@ -128,6 +201,7 @@ public:
 		writer.open(name, ios::binary);
 		if (!writer.is_open()) {
 			//cout << "не удалось открыть файл" << name << "\n";
+			throw FileException("не удаётся открыть файл" + name);
 			return false;
 		}
 		//cout << name << "\n";
@@ -154,16 +228,24 @@ public:
 	}
 };
 
-class Muter {
+class Converter {
+public:
+	virtual void show() = 0;
+};
+
+class Muter: public Converter {
 public:
 	void mute(short* sample, int num, int s, int f) {
 		if (s * 44100 <= num && num < f * 44100) {
 			*sample = 0;
 		}
 	}
+	void show() override {
+		cout << "mute <start> <finish> - <start> секунда начала, <finish> секунда конца, заглушает интервал\n";
+	}
 };
 
-class Mixer {
+class Mixer : public Converter {
 private:
 	int* dataLenghts;
 	SoundReaderSkiper* readers;
@@ -185,13 +267,19 @@ public:
 			*sample = ((*sample)+readers[trakNum - 1].readSample())/2;
 		}
 	}
-
+	void show() override {
+		cout << "mix $<number> <start> - $<number> номер input файла (начиная с 1, похоже можно и миксовать с самим собой), <start> секунда начала\n"
+			<< "усредняет амплитуду потоков начиная с старта первого потока и начала дополнительного (или как лучше написать?)\n";
+	}
 };
 
-class Shh {
+class Shh : public Converter {
 public:
 	void shhhh(short* sample, int lssr) {
 		*sample /= lssr;
+	}
+	void show() override {
+		cout << "shh <divider> - <divider> показатель уменьшения, умееньшает амплитуду\n";
 	}
 };
 
@@ -239,6 +327,9 @@ public:
 				int dev = stoi(comm);
 				shh.shhhh(sample, dev);
 			}
+			else {
+				throw ConfigException("неверные команды конфигурации");
+			}
 		}
 	}
 };
@@ -246,8 +337,14 @@ public:
 int main(int argc, char* argv[])
 {
 	SetConsoleOutputCP(CP_UTF8);//нужно чтобы консоль использовала ту же кодировку что и принты
+	
+	if (argc > 1 && (string)argv[1] != "-h" && (string)argv[1] != "-c") {
+		CommandLineException err("неверная команда для исполнения", 1);
+		cerr << err.what();
+		exit(err.getCode());
+	}
 
-	if ((string)argv[1] == "-h") {
+	if (argc == 1 || (string)argv[1] == "-h") {
 		cout << "Программа Sound Processor \n"
 			<< "[-h] -справка\n"
 			<< "[-c <config.txt> <output.wav> <input1.wav> [<input2.wav> …]] -редактирование звукового WAV-файла\n"
@@ -256,22 +353,45 @@ int main(int argc, char* argv[])
 			<< "<input1.wav> - первоначальный файл который будут менять\n"
 			<< "<input2.wav> … - дополнительные файлы нужные для изменений\n"
 			<< "файл конфигурации поддерживает комментарии начинающиеся с '#'\n"
-			<< "конвертеры:\n"
-			<< "mute <start> <finish> - <start> секунда начала, <finish> секунда конца, заглушает интервал\n"
-			<< "mix $<number> <start> - $<number> номер input файла (начиная с 1, похоже можно и миксовать с самим собой), <start> секунда начала\n"
-			<< "усредняет амплитуду потоков начиная с старта первого потока и начала дополнительного (или как лучше написать?)\n"
-			<< "shh <divider> - <divider> показатель уменьшения, умееньшает амплитуду\n";
+			<< "конвертеры:\n";	
+	
+		Converter* converters[3];
+
+		converters[0] = new Muter();
+		converters[1] = new Mixer(nullptr, 0);
+		converters[2] = new Shh();
+
+		for (int i = 0; i < 3; i++) {
+			(*converters[i]).show();
+		}
+
 		return 0;
 	}
 	else if ((string)argv[1] == "-c") {
-		SoundReader reader;
-		reader.open(argv[4]);
 
+		SoundReader reader;
 		Writer writer;
-		writer.open(argv[3]);
+
+		try
+		{
+			
+			reader.open(argv[4]);
+
+			writer.open(argv[3]);
+		}
+		catch (FileException err)
+		{
+			cerr << err.what() << std::endl;
+			exit(err.getCode());
+		}
 
 		char riff[5];
 		reader.readSymvols(riff, 4);
+		if ((string)riff != "RIFF") {
+			WAVException err("неправильный формат файла");
+			cerr << err.what();
+			exit(err.getCode());
+		}
 		//cout << riff << "\n";
 		writer.writeSymvols(riff, 4);
 
@@ -281,11 +401,25 @@ int main(int argc, char* argv[])
 
 		char wave[5];
 		reader.readSymvols(wave, 4);
+
+		if ((string)wave != "WAVE") {
+			WAVException err("неправильный формат файла");
+			cerr << err.what();
+			exit(err.getCode());
+		}
+
 		writer.writeSymvols(wave, 4);
 		//cout << wave << "\n";
 
 		char fmt[5];
 		reader.readSymvols(fmt, 4);
+
+		if ((string)fmt != "fmt ") {
+			WAVException err("неправильный формат файла");
+			cerr << err.what();
+			exit(err.getCode());
+		}
+
 		writer.writeSymvols(fmt, 4);
 		//cout << fmt << "\n";
 
@@ -325,21 +459,51 @@ int main(int argc, char* argv[])
 		//cout << "\n";
 
 		configReader cReader;
-		cReader.open(argv[2]);
+
+		try
+		{
+			cReader.open(argv[2]);
+		}
+		catch (FileException err)
+		{
+			cerr << err.what() << std::endl;
+			exit(err.getCode());
+		}
+
 		cReader.formConfigLine();
 		//cout << cReader.formConfigLine()<< "\n";
 
 		
 		int number = argc - 4; //все инпуты
 		SoundReaderSkiper* dopSounds = new SoundReaderSkiper[number];
-		for (int i = 0; i < number; i++) {
-			dopSounds[i].open(argv[4+i]);
+
+		try
+		{
+			for (int i = 0; i < number; i++) {
+				dopSounds[i].open(argv[4 + i]);
+			}
 		}
+		catch (FileException err)
+		{
+			cerr << err.what() << std::endl;
+			exit(err.getCode());
+		}
+
 		sampleChanger changer(cReader.getConfigLine(), dopSounds, number);
 		short sample;
 		for (int i = 0; i < (sizeData / 2); i++) {
 			sample = reader.readSample();
-			changer.doSample(i, &sample);
+
+			try
+			{
+				changer.doSample(i, &sample);
+			}
+			catch (FileException err)
+			{
+				cerr << err.what() << std::endl;
+				exit(err.getCode());
+			}
+			
 			writer.writeSample(sample);
 			//cout << sample << "\n";
 		}
