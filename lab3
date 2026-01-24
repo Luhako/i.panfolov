@@ -20,10 +20,10 @@ public:
 	bool open(string name) {
 		reader.open(name, ios::binary); //куча потерянного времени из-за символа 26 и открытия файла в обычном режиме
 		if (!reader.is_open()) {
-			cout << "не удалось открыть файл";
+			//cout << "не удалось открыть файл" << name << "\n";
 			return false;
 		}
-		cout << name << "\n";
+		//cout << name << "\n";
 		return true;
 	}
 };
@@ -103,6 +103,8 @@ public:
 			if (commandLine[0] != '#') {
 				configLine += commandLine + " ";
 			}
+			//cout <<"---" << commandLine << "---" << "\n";
+			//cout <<"+++" << configLine << "+++" << "\n";
 		}
 		return configLine;
 	}
@@ -125,10 +127,10 @@ public:
 	bool open(string name) {
 		writer.open(name, ios::binary);
 		if (!writer.is_open()) {
-			cout << "не удалось открыть файл";
+			//cout << "не удалось открыть файл" << name << "\n";
 			return false;
 		}
-		cout << name << "\n";
+		//cout << name << "\n";
 		return true;
 	}
 
@@ -179,8 +181,8 @@ public:
 	}
 
 	void mix(short* sample,int sampleNumber, int trakNum, int start) {
-		if (start * 44100 <= sampleNumber && sampleNumber < start * 44100 + dataLenghts[trakNum - 2] / 2) {//потому что дополнительные начинаются со второго, но нумеруются с 0
-			*sample = ((*sample)+readers[trakNum - 2].readSample())/2;
+		if (start * 44100 <= sampleNumber && sampleNumber < start * 44100 + dataLenghts[trakNum - 1] / 2) {//потому что дополнительные начинаются со второго, но нумеруются с 0
+			*sample = ((*sample)+readers[trakNum - 1].readSample())/2;
 		}
 	}
 
@@ -241,88 +243,111 @@ public:
 	}
 };
 
-int main()
+int main(int argc, char* argv[])
 {
 	SetConsoleOutputCP(CP_UTF8);//нужно чтобы консоль использовала ту же кодировку что и принты
 
-	SoundReader reader;
-	reader.open("900.wav");
-
-	Writer writer;
-	writer.open("output.wav");
-
-	char riff[5];
-	reader.readSymvols(riff, 4);
-	cout << riff << "\n";
-	writer.writeSymvols(riff, 4);
-
-	int almostAllSize = reader.readLenght();
-	cout << almostAllSize << "\n";
-	writer.writeLenght(almostAllSize);
-
-	char wave[5];
-	reader.readSymvols(wave, 4);
-	writer.writeSymvols(wave, 4);
-	cout << wave << "\n";
-
-	char fmt[5];
-	reader.readSymvols(fmt, 4);
-	writer.writeSymvols(fmt, 4);
-	cout << fmt << "\n";
-
-	int fmtSize = reader.readLenght();
-	cout << fmtSize << "\n";
-	writer.writeLenght(fmtSize);
-
-	char forBiliberda[2]; // массивы на один больше на всякий случай для нулевого элемента (хотя там ридеру вообще пофиг)
-
-	for (int i = 0; i < fmtSize; i++) {
-		reader.readSymvols(forBiliberda, 1);
-		cout << forBiliberda;
-		writer.writeSymvols(forBiliberda, 1);
+	if ((string)argv[1] == "-h") {
+		cout << "Программа Sound Processor \n"
+			<< "[-h] -справка\n"
+			<< "[-c <config.txt> <output.wav> <input1.wav> [<input2.wav> …]] -редактирование звукового WAV-файла\n"
+			<< "<config.txt> - текстовый файл с изменениями\n"
+			<< "<output.wav> - звуковой файл результа (может перезаписать существующий)\n"
+			<< "<input1.wav> - первоначальный файл который будут менять\n"
+			<< "<input2.wav> … - дополнительные файлы нужные для изменений\n"
+			<< "файл конфигурации поддерживает комментарии начинающиеся с '#'\n"
+			<< "конвертеры:\n"
+			<< "mute <start> <finish> - <start> секунда начала, <finish> секунда конца, заглушает интервал\n"
+			<< "mix $<number> <start> - $<number> номер input файла (начиная с 1, похоже можно и миксовать с самим собой), <start> секунда начала\n"
+			<< "усредняет амплитуду потоков начиная с старта первого потока и начала дополнительного (или как лучше написать?)\n"
+			<< "shh <divider> - <divider> показатель уменьшения, умееньшает амплитуду\n";
+		return 0;
 	}
-	cout << "\n";
+	else if ((string)argv[1] == "-c") {
+		SoundReader reader;
+		reader.open(argv[4]);
 
-	char data[5];
-	int sizeData;
-	 
-	while (true) {
-		reader.readSymvols(data, 4);
-		cout << data << "\n";
-		writer.writeSymvols(data, 4);
-		sizeData = reader.readLenght();
-		cout << sizeData << "\n";
-		writer.writeLenght(sizeData);
-		if ((string)data == "data") {
-			break;
-		}
-		for (int i = 0; i < sizeData; i++) {
+		Writer writer;
+		writer.open(argv[3]);
+
+		char riff[5];
+		reader.readSymvols(riff, 4);
+		//cout << riff << "\n";
+		writer.writeSymvols(riff, 4);
+
+		int almostAllSize = reader.readLenght();
+		//cout << almostAllSize << "\n";
+		writer.writeLenght(almostAllSize);
+
+		char wave[5];
+		reader.readSymvols(wave, 4);
+		writer.writeSymvols(wave, 4);
+		//cout << wave << "\n";
+
+		char fmt[5];
+		reader.readSymvols(fmt, 4);
+		writer.writeSymvols(fmt, 4);
+		//cout << fmt << "\n";
+
+		int fmtSize = reader.readLenght();
+		//cout << fmtSize << "\n";
+		writer.writeLenght(fmtSize);
+
+		char forBiliberda[2]; // массивы на один больше на всякий случай для нулевого элемента (хотя там ридеру вообще пофиг)
+
+		for (int i = 0; i < fmtSize; i++) {
 			reader.readSymvols(forBiliberda, 1);
+			//cout << forBiliberda;
 			writer.writeSymvols(forBiliberda, 1);
-			cout << forBiliberda;
 		}
-		cout << "\n";
+		//cout << "\n";
+
+		char data[5];
+		int sizeData;
+
+		while (true) {
+			reader.readSymvols(data, 4);
+			//cout << data << "\n";
+			writer.writeSymvols(data, 4);
+			sizeData = reader.readLenght();
+			//cout << sizeData << "\n";
+			writer.writeLenght(sizeData);
+			if ((string)data == "data") {
+				break;
+			}
+			for (int i = 0; i < sizeData; i++) {
+				reader.readSymvols(forBiliberda, 1);
+				writer.writeSymvols(forBiliberda, 1);
+				//cout << forBiliberda;
+			}
+			//cout << "\n";
+		}
+		//cout << "\n";
+
+		configReader cReader;
+		cReader.open(argv[2]);
+		cReader.formConfigLine();
+		//cout << cReader.formConfigLine()<< "\n";
+
+		
+		int number = argc - 4; //все инпуты
+		SoundReaderSkiper* dopSounds = new SoundReaderSkiper[number];
+		for (int i = 0; i < number; i++) {
+			dopSounds[i].open(argv[4+i]);
+		}
+		sampleChanger changer(cReader.getConfigLine(), dopSounds, number);
+		short sample;
+		for (int i = 0; i < (sizeData / 2); i++) {
+			sample = reader.readSample();
+			changer.doSample(i, &sample);
+			writer.writeSample(sample);
+			//cout << sample << "\n";
+		}
+
+		delete[] dopSounds;
+
+		return 0;
 	}
-	cout << "\n";
-
-	configReader cReader;
-	cReader.open("config.txt");
-	cout << cReader.formConfigLine();
-
-	int number = 1;
-	SoundReaderSkiper* dopSounds = new SoundReaderSkiper[number];
-	dopSounds[0].open("truba-upala.wav");
-
-	sampleChanger changer(cReader.getConfigLine(), dopSounds, number);
-	short sample;
-	for (int i = 0; i < (sizeData/2); i++) {
-		sample = reader.readSample();
-		changer.doSample(i, &sample);
-		writer.writeSample(sample);
-		//cout << sample << "\n";
-	}
-
-	delete[] dopSounds;
 }
 
 
